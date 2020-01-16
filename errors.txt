@@ -1,0 +1,7 @@
+0: Nothing
+**************************************
+1: Game already satisfied
+2: Move not valid
+3: Game not started
+4: Bad Formulation
+5: Bad party id

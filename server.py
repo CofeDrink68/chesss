@@ -181,7 +181,7 @@ class MainThread(threading.Thread): # On crée jne classe multiThread qui est le
         for conn in self.connections: # Pour toutes les conections
             conn.conn.close() # Auf widersehen
             conn.stop = True # On arrête le thread
-            conn.join()
+            conn.join() # On attend qu'ils s'arrête
 
 
 if __name__ == "__main__": # Si le code est éxecuté et pas ouvert par un autre programme python
@@ -198,5 +198,5 @@ if __name__ == "__main__": # Si le code est éxecuté et pas ouvert par un autre
             stop = True # on s'arrête 
             mt.stop = True # On coupe le thread
     
-    print("Stop")
-    exit(1)
+    print("Stop") # On affiche stop
+    exit(1) # On quitte

@@ -49,18 +49,25 @@ class Game(threading.Thread): # on initialise une nouvelle classe "Game"
         if not(self.isWhiteUsed is None) and not(self.isBlackUsed is None): # Est ce que les deux joueurs sont présents  
                 if color == (-1 if self.tour%2==0 else 1): # Est ce que c'est à la bonne personne de jouer
                     if not(self.board.is_game_over()):
-                        if chess.Move.from_uci(moveName) in self.board.legal_moves: # Est ce que le mouvement est possible
-                            m = chess.Move.from_uci(moveName) # On inscrit le mouvement
-                            self.board.push(m) # On le mets dans le plateau
-                            self.tour += 1 # On incrémente le tour
+                        if len(moveName) == 4:
+                            if chess.Move.from_uci(moveName) in self.board.legal_moves: # Est ce que le mouvement est possible
+                                m = chess.Move.from_uci(moveName) # On inscrit le mouvement
+                                self.board.push(m) # On le mets dans le plateau
+                                self.tour += 1 # On incrémente le tour
 
-                            if color == -1: # Si couleur blanche
-                                self.isWhiteUsed.send(json.dumps({"error": 0}).encode()) #dire qu'il n'y a pas d'erreur
-                            else: # Sinon
-                                self.isBlackUsed.send(json.dumps({"error": 0}).encode()) # dire qu'il n'y a pas d'erreur
+                                if color == -1: # Si couleur blanche
+                                    self.isWhiteUsed.send(json.dumps({"error": 0}).encode()) #dire qu'il n'y a pas d'erreur
+                                else: # Sinon
+                                    self.isBlackUsed.send(json.dumps({"error": 0}).encode()) # dire qu'il n'y a pas d'erreur
 
-                            return 0 # On renvoie que c'est bon
-                        else: # Si le mouvement est illégal
+                                return 0 # On renvoie que c'est bon
+                            else: # Si le mouvement est illégal
+                                if not(0 if self.tour%2==0 else 1): # Si c'est aux blancs
+                                    self.isWhiteUsed.send(json.dumps({"over": self.board.is_game_over(), "error": 4, "board": self.board.fen(), "is2Play": (-1 if self.tour%2==0 else 1)}).encode()) # On lui envoie une erreur 4
+                                else: # Si c'est au noirs
+                                    self.isBlackUsed.send(json.dumps({"over": self.board.is_game_over(), "error": 4, "board": self.board.fen(), "is2Play": (-1 if self.tour%2==0 else 1)}).encode()) # On lui envoie une erreur 4
+                                return 4 # On return l'error
+                        else:
                             if not(0 if self.tour%2==0 else 1): # Si c'est aux blancs
                                 self.isWhiteUsed.send(json.dumps({"over": self.board.is_game_over(), "error": 4, "board": self.board.fen(), "is2Play": (-1 if self.tour%2==0 else 1)}).encode()) # On lui envoie une erreur 4
                             else: # Si c'est au noirs
@@ -84,8 +91,40 @@ class Game(threading.Thread): # on initialise une nouvelle classe "Game"
         self.isBlackUsed.send(json.dumps(message).encode()) # On envoie le message au client noir
         self.isWhiteUsed.send(json.dumps(message).encode()) # On envoie le message au client blanc
 
+class Supervisor(threading.Thread):
+    def __init__(self, parent, parentOfParent):
+        threading.Thread.__init__(self)
+        self.parent = parentOfParent
+        self._self = parent
+
+    def run(self):
+        print(self.parent.connections)
+
+        message = self._self.conn.recv(2048) # On prends le message du client qui contient si on ouvre ou on crée une partie
+        message = json.loads(message.decode()) # On convertit la chaîne de caractère formatée JSON en tableau
+        if message["party"] == "new": # Si on crée une partie
+            gInst = Game() # On initialise une nouvelle instance de Game
+            gInst.start() # On démarre le thread
+            self._self.conn.send(json.dumps({"id": gInst.id}).encode()) # On envoie l'ID
+            self._self.parent.games[gInst.id] = gInst # On renseigne le moteur de jeu grace à son id
+            self._self.parent.connections[-1].gameObject = gInst # On l'affecte à la connection
+            self._self.parent.connections[-1].gameId = gInst.id # Ainsi que l'ID de partie
+        elif message["party"] == "join": # Si on joint une partie
+            _pass = True # Retour du try:
+            link = 0 # POur eviter les problèmes
+            try: # On essaye
+                link = int(message["link"]) # de transformer en int
+            except: # Si qq passe pas bien
+                _pass = False # On le sauvegarde
+            if link in self.parent.games and _pass: # Si l'id de partie est connue et pas d'erreur
+                self._self.conn.send(json.dumps({"error": 0}).encode()) # On renvoie au client qu'il n'y a pas d'erreur
+                self._self.parent.connections[-1].gameObject = self._self.parent.games[link] # On l'affecte à la connection
+                self._self.parent.connections[-1].gameId = self._self.parent.games[link].id # Ainsi que l'ID de partie
+            else: # Sinon
+                self._self.conn.send(json.dumps({"error": 5}).encode()) # Erreur (pour changer)
+
 class Connection(threading.Thread): # On crée une classe Multithread qui gère UNE connection via TCP/IP
-    def __init__(self, conn, addr, id): # on définit la fonction utilisation
+    def __init__(self, conn, addr, id, parent): # on définit la fonction utilisation
         threading.Thread.__init__(self) # On configure le thread
         # On copie les variables
         self.conn = conn
@@ -97,9 +136,20 @@ class Connection(threading.Thread): # On crée une classe Multithread qui gère 
         self.black_white = None
         self.stop = False # On stop le thread
 
+        self.parent = parent
+
+        self.s = Supervisor(self, self.parent)
+
     def run(self): # Lancement du thread
+        self.s.start()
+        self.s.join()
+
+        print("Supervisor finished "+str(self.addr))
+
         while (self.gameId is None) or (self.gameObject is None): # On attend d'avoir un game ID
             pass
+    
+        print("GameObject satisfied "+str(self.addr))
 
         self.black_white = self.gameObject.getColor(self.conn) # On obtient la couleur
 
@@ -110,36 +160,38 @@ class Connection(threading.Thread): # On crée une classe Multithread qui gère 
 
         while (self.gameObject.isWhiteUsed is None) or (self.gameObject.isBlackUsed is None): # On attend qu'ils soient connectés
             pass
+    
+        print("Game satisfied "+str(self.addr))
 
         while not self.stop: # Tant que ce n'est pas stoppé
             message = self.conn.recv(2048) # On récupère un message du client
-            print(message) # On débug :)
+            print("163"+message.decode()) # On débug :)
             if message.decode() != "": # Si c'est pas vide
                 message = json.loads(message.decode()) # On le décode
+                if(message["move"] is not None): # Si on lui demande de bouger quelque chose
+                    result = self.gameObject.move(self.black_white, message["move"])#On appelle la fonction move
+                    renvoi = {} # On initialise la variable renvoi
+                    renvoi["over"] = self.gameObject.board.is_game_over() # On ajoute si mat
+                    renvoi["board"] = self.gameObject.board.fen() # On renvoie le plateau
+                    renvoi["error"] = result # On renvoie le message d'erreur
+                    print("172"+str(renvoi)) # On débug ;)
+                    # self.conn.send(json.dumps(renvoi).encode()) # On utilise la connexion du client pour lui envoyer la variable renvoi.
+                    self.gameObject.isWhiteUsed.send(json.dumps(renvoi).encode()) # On envoie le message
+                    self.gameObject.isBlackUsed.send(json.dumps(renvoi).encode()) # Idem
+                    self.gameObject.begin() # On utilise begin() comme il faut pas XD
+                else: # Si le message ne contient pas de mouvement
+                    self.conn.send(json.dumps({"error": 4}).encode()) # On envoie l'erreur
             else: # Sinon
                 message = {"move": None} # On s'en fout et on évite les bugs
-            if(message["move"] is not None): # Si on lui demande de bouger quelque chose
-                result = self.gameObject.move(self.black_white, message["move"])#On appelle la fonction move
-                renvoi = {} # On initialise la variable renvoi
-                renvoi["over"] = self.gameObject.board.is_game_over() # On ajoute si mat
-                renvoi["board"] = self.gameObject.board.fen() # On renvoie le plateau
-                renvoi["error"] = result # On renvoie le message d'erreur
-                print(renvoi) # On débug ;)
-                # self.conn.send(json.dumps(renvoi).encode()) # On utilise la connexion du client pour lui envoyer la variable renvoi.
-                self.gameObject.isWhiteUsed.send(json.dumps(renvoi).encode()) # On envoie le message
-                self.gameObject.isBlackUsed.send(json.dumps(renvoi).encode()) # Idem
-                self.gameObject.begin() # On utilise begin() comme il faut pas XD
-            else: # Si le message ne contient pas de mouvement
-                self.conn.send(json.dumps({"error": 4}).encode()) # On envoie l'erreur
 
 class MainThread(threading.Thread): # On crée jne classe multiThread qui est le coeur du système
-    def __init__(self, port=554): # On définit la fonction d'initialisation
+    def __init__(self, port=554, ip="127.0.0.1"): # On définit la fonction d'initialisation
         threading.Thread.__init__(self) # On définit le thread
         # On copie la variable port mais pas trop globale :)
         self.port = port
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # On initialise le socket
-        self.sock.bind(("127.0.0.1", self.port)) # On affecte le port au socket
+        self.sock.bind((ip, self.port)) # On affecte le port au socket
 
         # Initialisation des variables
         self.stop = False
@@ -154,32 +206,10 @@ class MainThread(threading.Thread): # On crée jne classe multiThread qui est le
                 try: # Pour eviter les erreures lors d'un arrêt méchant
                     conn, addr = self.sock.accept() # On attends la venu d'une connection et on accepte
                 except: # Si ya des erreures    
-                    pass # On passe
+                    break # On quitte
                 print("Nouvelle connection avec "+str(addr)) # On débug
-                self.connections.append(Connection(conn, addr, len(self.connections))) # On ouvre une nouvelle instance de Connection et  on la mets dans la variable self.connections
+                self.connections.append(Connection(conn, addr, len(self.connections), self)) # On ouvre une nouvelle instance de Connection et  on la mets dans la variable self.connections
                 self.connections[-1].start() # On démare l'instance de connection
-                message = conn.recv(2048) # On prends le message du client qui contient si on ouvre ou on crée une partie
-                message = json.loads(message.decode()) # On convertit la chaîne de caractère formatée JSON en tableau
-                if message["party"] == "new": # Si on crée une partie
-                    gInst = Game() # On initialise une nouvelle instance de Game
-                    gInst.start() # On démarre le thread
-                    conn.send(json.dumps({"id": gInst.id}).encode()) # On envoie l'ID
-                    self.games[gInst.id] = gInst # On renseigne le moteur de jeu grace à son id
-                    self.connections[-1].gameObject = gInst # On l'affecte à la connection
-                    self.connections[-1].gameId = gInst.id # Ainsi que l'ID de partie
-                elif message["party"] == "join": # Si on joint une partie
-                    _pass = True # Retour du try:
-                    link = 0 # POur eviter les problèmes
-                    try: # On essaye
-                        link = int(message["link"]) # de transformer en int
-                    except: # Si qq passe pas bien
-                        _pass = False # On le sauvegarde
-                    if link in self.games and _pass: # Si l'id de partie est connu et pas d'erreur
-                        conn.send(json.dumps({"error": 0}).encode()) # On renvoie au client qu'il n'y a pas d'erreur
-                        self.connections[-1].gameObject = gInst # On l'affecte à la connection
-                        self.connections[-1].gameId = gInst.id # Ainsi que l'ID de partie
-                    else: # Sinon
-                        conn.send(json.dumps({"error": 5}).encode()) # Erreur (pour changer)
         
         for conn in self.connections: # Pour toutes les conections
             conn.conn.close() # Auf widersehen
@@ -189,9 +219,11 @@ class MainThread(threading.Thread): # On crée jne classe multiThread qui est le
 
 if __name__ == "__main__": # Si le code est éxecuté et pas ouvert par un autre programme python
     clear() # On clear le terminal
-    port = 554 # On définit le port
+    port = 80 # On définit le port
+    hostname = socket.gethostname() # On récupère le nom du pc
+    IPAddr = socket.gethostbyname(hostname) # et son ip
     print("Serveur démaré sur le port "+str(port)) # Quand on a pas envie de lire la doc ;)
-    mt = MainThread(port=port) # On ouvre une instance de MainThread sur le port 554
+    mt = MainThread(port=port, ip=IPAddr) # On ouvre une instance de MainThread sur le port 554
     mt.start() # et on la démarre
     stop = False # On définit la variable du stop
     while not(stop): # tant qu'on s'arrête pas

@@ -13,7 +13,7 @@ def standard():
     print("*************************************") 
     print(" ****  ****  *  *  ****  ****  /****/")
     print(" **   *      ****  **   *     /****\\")  
-    print(" ****  ****  *  *  ****  ****   \***\\") 
+    print(" ****  ****  *  *  ****  ****  \****\\") 
     print("*************************************") 
 
 
@@ -84,12 +84,16 @@ party = {"stop": False} # POur eviter les erreures :)
 
 first = True # Pour savoir si on doit attendre le serveur ou si on doit prendre la deuxième partie du message ligne 74
 
+print(m__)
+
 while party["stop"] == False: # Tant que pas échech
-    if first: # Si c'est la première fois
+    if first and m__[1] != '': # Si c'est la première fois
         m = m__[1]+"}" # On formatte
         m = json.loads(m) # On importe
         first = False # On evite de repasser là la prochaine fois
     else: # Si c'est une fois déjà experimentée 
+        if m__[1] == '':
+            first = False
         m = s.recv(2048) # On attends pour un message
         m = json.loads(m.decode()) # On le décode
 

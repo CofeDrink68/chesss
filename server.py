@@ -151,7 +151,10 @@ class MainThread(threading.Thread): # On crée jne classe multiThread qui est le
         self.sock.listen(1) # On commence écouter
         while not self.stop: # Tant que le thread n'est pas fini
             if self.accept: # Si on accepte :
-                conn, addr = self.sock.accept() # On attends la venu d'une connection et on accepte
+                try: # Pour eviter les erreures lors d'un arrêt méchant
+                    conn, addr = self.sock.accept() # On attends la venu d'une connection et on accepte
+                except: # Si ya des erreures    
+                    pass # On passe
                 print("Nouvelle connection avec "+str(addr)) # On débug
                 self.connections.append(Connection(conn, addr, len(self.connections))) # On ouvre une nouvelle instance de Connection et  on la mets dans la variable self.connections
                 self.connections[-1].start() # On démare l'instance de connection
@@ -197,6 +200,8 @@ if __name__ == "__main__": # Si le code est éxecuté et pas ouvert par un autre
         if "stop" in m: # si on a entré fini
             stop = True # on s'arrête 
             mt.stop = True # On coupe le thread
+            mt.sock.close() # On arrete violamanet le serveur grâce à de merveilleuses erreures 
+            mt.join() # On attend que le thread soit coupé
     
     print("Stop") # On affiche stop
     exit(1) # On quitte

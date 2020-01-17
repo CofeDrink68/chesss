@@ -7,7 +7,7 @@ Le serveur est par défaut sur le port 554
 
 Et c'est en DEVELOPPEMENT n'hésitez pas à reporter les bugs <3
 
-Jeu :
+1. Jeu :
 
 La grille se compose : 
 
@@ -35,7 +35,7 @@ Exemple :
 
 a2a4 va bouger la pière en a2 pour la mettre en a4
 
-Installation des dépendances: 
+2. Installation des dépendances: 
 
 `pip install python-chess json`
 

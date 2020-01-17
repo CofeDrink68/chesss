@@ -78,7 +78,7 @@ else: # Si on crée une partie
 m__ = s.recv(2048).decode().split("}") # Deux json en un, pour les sepparer
 m = json.loads(m__[0]+"}") # On prend le premier 
 
-color = m # On récupère la couleur
+color = m # On récupère le type de joueur
 
 party = {"stop": False} # POur eviter les erreures :)
 

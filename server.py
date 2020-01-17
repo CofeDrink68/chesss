@@ -4,6 +4,12 @@ import chess     # on importe chess, une librairie moteur d'échec
 import json      # on importe json, une librairue pour traiter du json
 import random    # on importe random, une librairie pour générer des nombres aléatoires
 import time      # on importe time, une librairie de temps
+import os        # on importe la librairie système
+
+linux = False
+
+def clear(): # On définit la fonction pour nettoyer le terminal
+    os.system("clear" if linux else "cls") # On execute cls sour windows ou clear sous linux
 
 class Game(threading.Thread): # on initialise une nouvelle classe "Game"
     def __init__(self): # Fonction d'initialisation
@@ -146,6 +152,7 @@ class MainThread(threading.Thread): # On crée jne classe multiThread qui est le
         while not self.stop: # Tant que le thread n'est pas fini
             if self.accept: # Si on accepte :
                 conn, addr = self.sock.accept() # On attends la venu d'une connection et on accepte
+                print("Nouvelle connection avec "+str(addr)) # On débug
                 self.connections.append(Connection(conn, addr, len(self.connections))) # On ouvre une nouvelle instance de Connection et  on la mets dans la variable self.connections
                 self.connections[-1].start() # On démare l'instance de connection
                 message = conn.recv(2048) # On prends le message du client qui contient si on ouvre ou on crée une partie
@@ -170,8 +177,26 @@ class MainThread(threading.Thread): # On crée jne classe multiThread qui est le
                         self.connections[-1].gameId = gInst.id # Ainsi que l'ID de partie
                     else: # Sinon
                         conn.send(json.dumps({"error": 5}).encode()) # Erreur (pour changer)
+        
+        for conn in self.connections: # Pour toutes les conections
+            conn.conn.close() # Auf widersehen
+            conn.stop = True # On arrête le thread
+            conn.join()
 
 
 if __name__ == "__main__": # Si le code est éxecuté et pas ouvert par un autre programme python
-    mt = MainThread(port=554) # On ouvre une instance de MainThread sur le port 554
+    clear() # On clear le terminal
+    port = 554 # On définit le port
+    print("Serveur démaré sur le port "+str(port)) # Quand on a pas envie de lire la doc ;)
+    mt = MainThread(port=port) # On ouvre une instance de MainThread sur le port 554
     mt.start() # et on la démarre
+    stop = False # On définit la variable du stop
+    while not(stop): # tant qu'on s'arrête pas
+        m = input("$ ") # On demande une commande
+
+        if "stop" in m: # si on a entré fini
+            stop = True # on s'arrête 
+            mt.stop = True # On coupe le thread
+    
+    print("Stop")
+    exit(1)

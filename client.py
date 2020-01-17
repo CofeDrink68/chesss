@@ -16,7 +16,11 @@ def standard():
     print(" ****  ****  *  *  ****  ****   \***\\") 
     print("*************************************") 
 
-ip = input("Adresse IP du serveur : ") # On demande l'IP du serveur
+
+clear()
+standard()
+
+ip = input("\nAdresse IP du serveur : ") # On demande l'IP du serveur
 port = input("Le port du serveur : ") # On demande le port du serveur
 
 try:

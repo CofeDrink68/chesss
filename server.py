@@ -219,7 +219,7 @@ class MainThread(threading.Thread): # On crée jne classe multiThread qui est le
 
 if __name__ == "__main__": # Si le code est éxecuté et pas ouvert par un autre programme python
     clear() # On clear le terminal
-    port = 80 # On définit le port
+    port = 554 # On définit le port
     hostname = socket.gethostname() # On récupère le nom du pc
     IPAddr = socket.gethostbyname(hostname) # et son ip
     print("Serveur démaré sur le port "+str(port)) # Quand on a pas envie de lire la doc ;)

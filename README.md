@@ -51,7 +51,7 @@ a2a4 va bouger la pière en a2 pour la mettre en a4
     `python client.py`
 
     Le client démare et vous demande d'entrer l'adresse ip du serveur. Si le serveur tourne sur la même machine que le client alors entrer :
-    `128.0.0.1`
+    `127.0.0.1`
     Puis le client demande le port, par défaut entrer
     `554`
 
